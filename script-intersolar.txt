@@ -1,0 +1,108 @@
+##Criação dos usuários
+# Definir o nome de usuário e a senha
+$Username = 'SOLFACIL'
+$Password = ConvertTo-SecureString 'InterSolar@2024' -AsPlainText -Force
+
+# Criar o novo usuário
+New-LocalUser -Name $Username -Password $Password -Description 'Descrição do usuário' -FullName 'SOLFACIL' -UserMayNotChangePassword -PasswordNeverExpires
+
+# Adicionar o usuário ao grupo de usuários
+Add-LocalGroupMember -Group 'Usuários' -Member $Username
+##Desinstalar programas
+$app = Get-WmiObject -Class Win32_Product | Where-Object {
+$_.Name -match "Symantec Endpoint Protection"
+}
+$app.Uninstall()
+! se para um laço :
+$nomesDosProgramas = @("Primeiro Programa", "Segundo Programa", "Terceiro Programa") # Adicione os nomes dos programas aqui
+foreach ($nome in $nomesDosProgramas) {
+    $app = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -match $nome }
+    if ($app) {
+        $app.Uninstall()
+    }
+}
+##Windows Update
+# Instala o módulo PSWindowsUpdate
+Install-Module -Name PSWindowsUpdate -Force -SkipPublisherCheck
+# Verifica as atualizações disponíveis
+Get-WindowsUpdate
+# Instala as atualizações
+Install-WindowsUpdate -AcceptAll -AutoReboot
+
+##Mudar papel e bloqueio
+# Define o caminho para a imagem de fundo desejada
+$ImagePath = "E:\\Suporte\sollogo\inter.png" # Substitua "D:\\Imagem.jpg" pelo caminho do seu pendrive e o nome da imagem
+
+# Para alterar o papel de parede
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public class Wallpaper {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+}
+"@
+
+$SPI_SETDESKWALLPAPER = 0x0014
+$UpdateIniFile = 0x01
+$SendChangeEvent = 0x02
+
+[Wallpaper]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $ImagePath, $UpdateIniFile -bor $SendChangeEvent)
+
+# Para alterar a tela de bloqueio
+# Define o caminho para a pasta onde a imagem de fundo será copiada
+$LockScreenFolder = "$env:LOCALAPPDATA\\Packages\\Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy\\LocalState\\Assets"
+
+# Copia a imagem de fundo para a pasta da tela de bloqueio
+Copy-Item $ImagePath $LockScreenFolder
+
+# Renomeia a imagem copiada com a extensão .jpg
+Get-ChildItem $LockScreenFolder | ForEach-Object {
+    $newName = $_.Name + ".png"
+    if (-not (Test-Path (Join-Path $LockScreenFolder $newName))) {
+        Rename-Item -Path $_.FullName -NewName $newName
+    }
+}
+
+# Obtém o nome da imagem copiada
+$LockScreenImage = Get-ChildItem $LockScreenFolder | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+# Define o caminho completo para a imagem de fundo da tela de bloqueio
+$LockScreenImagePath = Join-Path $LockScreenFolder $LockScreenImage.Name
+
+# Define as configurações de registro para a imagem de fundo da tela de bloqueio
+$path = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization"
+if (-not (Test-Path $path)) {
+    New-Item -Path $path -Force | Out-Null
+}
+Set-ItemProperty -Path $path -Name "LockScreenImage" -Value $LockScreenImagePath
+
+##Instalação por pendrive
+# Nome do instalador
+$installerName = "NomeDoInstalador.exe"
+
+# Caminho do pendrive
+$drivePath = "D:\"
+
+# Caminho completo do instalador
+$installerPath = Join-Path -Path $drivePath -ChildPath $installerName
+
+# Função para iniciar a instalação
+function Start-Installation {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$InstallerPath
+    )
+
+    if (Test-Path -Path $InstallerPath) {
+        # Iniciar a instalação
+        Start-Process -FilePath $InstallerPath -Wait
+        Write-Host "Instalação concluída."
+    } else {
+        Write-Host "Instalador não encontrado no caminho especificado: $InstallerPath"
+    }
+}
+
+# Chamar a função de instalação
+Start-Installation -InstallerPath $installerPath
